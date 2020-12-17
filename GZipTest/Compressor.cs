@@ -43,7 +43,7 @@ namespace GZipTest
       }
       Task.WaitAll(TaskList.ToArray());
       return 0;
-    } //TODO: try to fakemake a gz file and decompress it. might find what to substitute for it to work
+    }
     private async Task CompressPartitionAsync(int TaskId)
     { //  awaits on IO operations keep IO busy
       using (MemoryStream ms = new MemoryStream())
@@ -52,9 +52,9 @@ namespace GZipTest
         {
           int tempSize = BufferSize < RemainingBufferSize ? BufferSize : (int)RemainingBufferSize;
           RemainingBufferSize -= tempSize;
-          byte[] tempInputBytes = new byte[tempSize];
-          await InputFS.ReadAsync(tempInputBytes, 0, tempSize);
-          compressionStream.Write(tempInputBytes, 0, tempInputBytes.Length);
+          Memory<byte> tempInputBytes = new Memory<byte>(new byte[tempSize]);
+          await InputFS.ReadAsync(tempInputBytes);
+          compressionStream.Write(tempInputBytes.Span);
         }
         if (TaskId > 0)
         {

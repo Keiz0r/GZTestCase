@@ -23,9 +23,6 @@ namespace GZipTest
         Console.WriteLine("File " + args[2] + " already exists");
         return 1;
       }
-
-      //Read about System.Span<T>
-
       if (String.Equals(args[0], "compress", StringComparison.OrdinalIgnoreCase))
       {
         Compressor comp = new Compressor(args[1], args[2], 1024 * 1024 * 10); //10MB

@@ -2,7 +2,7 @@
   "profiles": {
     "GZipTest": {
       "commandName": "Project",
-      "commandLineArgs": ""
+      "commandLineArgs": "compress in1.djvu Wallpaper.jpg.gz"
     }
   }
 }
