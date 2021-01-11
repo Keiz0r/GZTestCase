@@ -3,11 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace GZipTest
 {
-  class Compressor
+  public class Compressor
   {
+    private readonly int BufferSize;
+    private readonly int partitions;
+    private long RemainingBufferSize;
+    private FileStream InputFS;
+    private FileStream OutputFS;
+    private List<Task> TaskList;
+
     public Compressor(string InputFileName, string OutputFileName, int BufferSize)
     {
       this.BufferSize = BufferSize;
@@ -17,6 +25,7 @@ namespace GZipTest
       partitions = (int)(InputFS.Length / BufferSize) + 1;
       TaskList = new List<Task>(partitions);
     }
+
     public int Compress()
     {
       for(int i = 0; i < partitions; i++)
@@ -34,6 +43,7 @@ namespace GZipTest
       //  OutputFS.Write(bb2, 10, bb2.Length -10);
       return 0;
     }
+
     public int Decompress()
     {
       for (int i = 0; i < partitions; i++)
@@ -44,6 +54,7 @@ namespace GZipTest
       Task.WaitAll(TaskList.ToArray());
       return 0;
     }
+
     private async Task CompressPartitionAsync(int TaskId)
     { //  awaits on IO operations keep IO busy
       using (MemoryStream ms = new MemoryStream())
@@ -64,6 +75,7 @@ namespace GZipTest
         await ms.CopyToAsync(OutputFS);
       }
     }
+
     private async Task DecompressPartitionAsync(int TaskId)
     { //  awaits on IO operations keep IO busy
       using (MemoryStream ms = new MemoryStream())
@@ -97,15 +109,9 @@ namespace GZipTest
           await decompressionStream.CopyToAsync(OutputFS);  //TODO: bug! throws after 1st use
           OutputFS.Flush();
         }
-        
+
       }
     }
 
-    private readonly int BufferSize;
-    private long RemainingBufferSize;
-    private FileStream InputFS;
-    private FileStream OutputFS;
-    private List<Task> TaskList;
-    private readonly int partitions;
   }
 }
