@@ -12,7 +12,7 @@ namespace GZipTest
         Console.WriteLine("Usage: [(de)compress] [file in] [file out]");
         return 1;
       }
-
+      
       if (!File.Exists(args[1]))
       {
         Console.WriteLine("File " + args[1] + " does not exist");
@@ -23,15 +23,17 @@ namespace GZipTest
         Console.WriteLine("File " + args[2] + " already exists");
         return 1;
       }
+      
+      
       if (String.Equals(args[0], "compress", StringComparison.OrdinalIgnoreCase))
       {
-        Compressor comp = new Compressor(args[1], args[2], 1024 * 1024 * 10); //10MB
-        comp.Compress();
+        NewCompressor newc = new NewCompressor(args[1], args[2]);
+        newc.Compress();
       }
       else if (String.Equals(args[0], "decompress", StringComparison.OrdinalIgnoreCase))
       {
-        Compressor comp = new Compressor(args[1], args[2], 1024 * 1024 * 10); //10MB
-        comp.Decompress();
+        NewCompressor newc = new NewCompressor(args[1], args[2]);
+        newc.Decompress();
       }
       return 0;
     }
