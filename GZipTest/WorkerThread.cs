@@ -1,32 +1,31 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
 
 namespace GZipTest
 {
   public class WorkerThread
   {
-    private static Queue<Action> p_q;
-    private static Mutex p_mutex;
     private Thread t;
     private AutoResetEvent p_starthandle;
-    private bool active = true;
-    private bool isBusy = false;
-    private static UInt32 finishedTasks;
-    private static Mutex m_finishedtasksMutex;
+    private bool active;
+    private bool isBusy;
+    private byte finishedTask;
+    public Action Work { get; set; }
     public string Name { get { return t.ManagedThreadId.ToString(); } }
     public bool IsBusy { get { return isBusy; } }
-    public static UInt32 FinishedTasks { get { return finishedTasks; } }
-    public WorkerThread(Queue<Action> que, Mutex m, AutoResetEvent wh)
+    public byte FinishedTask { get { return finishedTask; } } // part of ThreadPool counter
+
+    public WorkerThread(AutoResetEvent wh)
     {
-      p_q = que;
-      p_mutex = m;
       p_starthandle = wh;
-      m_finishedtasksMutex = new Mutex();
+      active = true;
+      isBusy = false;
+      finishedTask = 0;
       t = new Thread(Run);
       t.Start();
     }
-    public WorkerThread(int name, Queue<Action> que,  Mutex m, AutoResetEvent wh) : this(que, m, wh)
+
+    public WorkerThread(int name, AutoResetEvent wh) : this(wh)
     {
       t.Name = "Worker thread #" + name.ToString();
     }
@@ -43,19 +42,14 @@ namespace GZipTest
       {
         // activate on signal from dispatcher
         p_starthandle.WaitOne();
+        finishedTask = 0;
         isBusy = true;
-        Action a;
-        p_mutex.WaitOne();
-        p_q.TryDequeue(out a);
-        p_mutex.ReleaseMutex();
-        if(a != null)
+        if(Work != null)
         {
           Console.WriteLine("Thread " + Thread.CurrentThread.ManagedThreadId + " invokes work");
-          a.Invoke();
-          //show # of tasks finished
-          m_finishedtasksMutex.WaitOne();
-          finishedTasks++;
-          m_finishedtasksMutex.ReleaseMutex();
+          Work.Invoke();
+          Work = null;
+          finishedTask = 1;
         }
         isBusy = false;
       }

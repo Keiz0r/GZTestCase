@@ -9,13 +9,14 @@ namespace GZipTest
     private const int DspPollRate_ms = 10;
     private static ThreadPool instance;
     private static WorkerThread[] Pool;
-    private static Queue<Action> m_q = new Queue<Action>();  //  ConcurrentQueue for !testcase
-    private static Mutex m_mutex = new Mutex();
-    private static bool isRunning = true;
+    private static Queue<Action> q;  //  ConcurrentQueue for !testcase
+    private static Mutex mutex;
+    private static bool isRunning;
     private static AutoResetEvent[] m_WTwaithandle;
     private static AutoResetEvent DspWaithandle;
+    public byte MaxThreads { get; } = 4;
     public AutoResetEvent Finished { get; set; } = new AutoResetEvent(false);
-    public UInt32 Taskstodo { get; set; } //  TODO: ugly
+    public uint Taskstodo { get; set; }
     public static ThreadPool Instance { 
       get
       {
@@ -26,21 +27,24 @@ namespace GZipTest
         return instance;
       }
     }
-    public  byte MaxThreads { get; } = 4;
+
     private ThreadPool()
     {
       Init();
     }
+
     //public ThreadPool(byte maxThreads)
     //{
     //  MaxThreads = maxThreads;
     //  Init();
     //}
+
     public void AddTask(Action a)
     {
-      m_mutex.WaitOne();
-      m_q.Enqueue(a);
-      m_mutex.ReleaseMutex();
+      // protected from race
+      mutex.WaitOne();
+      q.Enqueue(a);
+      mutex.ReleaseMutex();
       DspWaithandle.Set();
     }
 
@@ -58,28 +62,31 @@ namespace GZipTest
 
     public void Run()
     {
+      isRunning = true;
       Thread t = new Thread(() => {
+        int finishedTasks = 0;
         while (isRunning)
         {
           DspWaithandle.WaitOne(DspPollRate_ms);
-          //check if 
-          if(Taskstodo == WorkerThread.FinishedTasks)
-          {
-            Finished.Set();
-          }
 
-          if(m_q.Count == 0)
-          {
-            continue;
-          }
-          // send  !Busy threads to work
-          for (int i = 0; i < MaxThreads; ++i)
+          for (int i = 0; i < MaxThreads; i++)
           {
             if (!Pool[i].IsBusy)
             {
+              finishedTasks += Pool[i].FinishedTask;
+
+              if (q.Count == 0)
+                continue;
+
               Console.WriteLine("Dispatcher sending work to " + Pool[i].Name);
+              Pool[i].Work = q.Dequeue(); //Simplified data flow with dequeueing by caller itself
               m_WTwaithandle[i].Set();
             }
+          }
+
+          if (Taskstodo == finishedTasks)
+          {
+            Finished.Set();
           }
         }
       });
@@ -88,13 +95,15 @@ namespace GZipTest
 
     private void Init()
     {
-      DspWaithandle = new AutoResetEvent(false);
       Pool = new WorkerThread[MaxThreads];
+      q = new Queue<Action>();
+      mutex = new Mutex();
       m_WTwaithandle = new AutoResetEvent[MaxThreads];
+      DspWaithandle = new AutoResetEvent(false);
       for (int i = 0; i < MaxThreads; ++i)
       {
         m_WTwaithandle[i] = new AutoResetEvent(false);
-        Pool[i] = new WorkerThread(i, m_q, m_mutex, m_WTwaithandle[i]);
+        Pool[i] = new WorkerThread(i, m_WTwaithandle[i]);
       }
     }
   }

@@ -8,29 +8,30 @@ namespace GZipTest
   class NewCompressor
   {
     private const int BufferSize = 1024 * 1024 * 5;  //5MB
+    private const int WriteTimeoutRate_ms = 10;
     private readonly ThreadPool tp;
+    private readonly string InputFileName;
     private readonly FileStream OutputFS;
     private readonly UInt32 partitions;
-    private int nextPartitionToWrite = 0;
-    private AutoResetEvent WriteWaitHandle = new AutoResetEvent(false);
-    private const int WriteTimeoutRate_ms = 10;
-    private readonly string InputFileName;
+    private AutoResetEvent WriteWaitHandle;
+
     public NewCompressor(string InputFileName, string OutputFileName)
     {
+      tp = ThreadPool.Instance;
+      tp.Taskstodo = partitions;
       this.InputFileName = InputFileName;
       OutputFS = new FileStream(OutputFileName, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferSize);
       partitions = (UInt32)(new FileInfo(InputFileName).Length / BufferSize) + 1;
-
-      tp = ThreadPool.Instance;
-      tp.Taskstodo = partitions;
+      WriteWaitHandle = new AutoResetEvent(false);
     }
 
     public void Compress()
     {
+      int nextPartitionToWrite = 0;
       tp.Run();
       for (int i = 0; i < partitions; i++)
       {
-        //  enum tasks to ensure correct final write order
+        //  enumerate tasks to ensure correct final write order
         int temp = i;
         // for each partition add task to threadpool
         tp.AddTask(() => {
@@ -66,8 +67,10 @@ namespace GZipTest
       tp.Finished.WaitOne();
       tp.StopAll();
     }
+
     public void Decompress()
     {
+      int nextPartitionToWrite = 0;
       tp.Run();
       for (int i = 0; i < partitions; i++)
       {
@@ -97,7 +100,7 @@ namespace GZipTest
               //  Write to file and signal to others
               Console.WriteLine(taskNum + " is writing");
               ms.Position = 0;  // underlying ms stream position matters in this case, even though ms holds input data
-              decompressionStream.CopyTo(OutputFS);
+              decompressionStream.CopyTo(OutputFS); //  BUG: this throws on 2nd call. either use in a single thread or idk
               OutputFS.Flush();
               Console.WriteLine(taskNum + " finished writing");
               nextPartitionToWrite++;
